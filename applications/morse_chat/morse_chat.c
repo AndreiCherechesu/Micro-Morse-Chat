@@ -13,12 +13,13 @@
 #include "morse_chat.h"
 
 
-#define NETWORK_URL "https://62044c2fc6d8b20017dc34c5.mockapi.io/api/v1/messages"
+#define USERS_URL "http://3.69.223.241:8000/users"
+#define MESSAGES_URL "http://3.69.223.241:8000/messages"
 
 char display_buff[64] __attribute__((aligned(64)));
 bool display_done = false;
 
-/* 
+/*
  * Function to parse received serial morse data
  * Returns the data parsed into a struct message_t "msg"
  * Sets "num_messages"
@@ -31,7 +32,7 @@ struct message_t *parse_data(char *data, int *num_messages)
 
 	/* Get number of messages from buffer */
 	sscanf(data, "%d", num_messages);
-	
+
 	/* Alloc struct for parsing data */
 	msg = calloc(*num_messages, sizeof(struct message_t));
 	for (int i = 0; i < *num_messages; i++)
@@ -85,6 +86,18 @@ static int setup_display_ipc(int *display_service)
 	return 0;
 }
 
+int register_user() {
+	char *data = network_get(USERS_URL, 1024);
+    if (!data) {
+        printf("Couldn't receive data\n");
+        return -2;
+    }
+
+	printf("Received data: %s\n", data);
+
+	free(data);
+}
+
 int main(void)
 {
 	struct message_t *msg;
@@ -97,35 +110,29 @@ int main(void)
 		return -1;
 	}
 
-	char *data = network_get(NETWORK_URL, 1024);
-	if (!data) {
-		printf("Couldn't receive data\n");
-		return -2;
-	}
-
-	// network_post(NETWORK_URL, "{}");
-
-	printf("Got: %s\n", data);
-
-	msg = parse_data(data, &num_messages);
-
 	ret = setup_display_ipc(&display_service);
 	if (ret < 0) {
 		printf("Couldn't setup Display Service\n");
 		return -3;
 	}
 
-	/* For each received message */
-	for (int i = 0; i < num_messages; i++)
-	{
-		display_done = false;
-			
-		/* Call the display service */
-		snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
-		ret = ipc_notify_service(display_service);
-		yield_for(&display_done);
-	}
+	register_user();
 
-	free(data);
+
+    // msg = parse_data(data, &num_messages);
+
+
+	/* For each received message */
+	// for (int i = 0; i < num_messages; i++)
+	// {
+	// 	display_done = false;
+			
+	// 	/* Call the display service */
+	// 	snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
+	// 	ret = ipc_notify_service(display_service);
+	// 	yield_for(&display_done);
+	// }
+
+	
 	return 0;
 }
