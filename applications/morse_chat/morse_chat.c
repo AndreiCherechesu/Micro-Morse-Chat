@@ -13,12 +13,13 @@
 #include "morse_chat.h"
 
 
-#define NETWORK_URL "https://62044c2fc6d8b20017dc34c5.mockapi.io/api/v1/messages"
-#define NETWORK_POST "http://3.69.223.241:8000/messages"
+#define USERS_URL "http://3.69.223.241:8000/users"
+#define MESSAGES_URL "http://3.69.223.241:8000/messages"
 
 char display_buff[64] __attribute__((aligned(64)));
 bool display_done = false;
-int sender_ID = 1;
+int user_id;
+
 /*
  * Function to parse received serial morse data
  * Returns the data parsed into a struct message_t "msg"
@@ -49,7 +50,7 @@ struct message_t *parse_data(char *data, int *num_messages)
 	{
 		sscanf(messages, "%d,%s", &(msg[i].uid), msg[i].morse);
 		printf("%d,%s\n", msg[i].uid, msg[i].morse);
-		messages += 12;
+		messages += strlen(msg[i].morse) + 2;
 	}
 
 	return msg;
@@ -86,6 +87,37 @@ static int setup_display_ipc(int *display_service)
 	return 0;
 }
 
+int register_user()
+{
+	int user_id;
+	char *data = network_get(USERS_URL, 1024);
+    if (!data) {
+        printf("Couldn't receive data\n");
+        return -2;
+    }
+
+	sscanf(data, "%d", &user_id);
+
+	free(data);
+
+	return user_id;
+}
+
+char *get_messages(int user_id)
+{
+	char *endpoint = calloc(128, sizeof(char));
+	sprintf(endpoint, "%s/%d", MESSAGES_URL, user_id);
+	char *data = network_get(endpoint, 1024);
+	if (!data) {
+		printf("Couldn't receive data\n");
+		return NULL;
+	}
+
+	free(endpoint);
+
+	return data;
+}
+
 static void main_ipc_callback(int pid, int len, int buf,
 					__attribute__ ((unused)) void* ud)
 {
@@ -98,8 +130,7 @@ static void main_ipc_callback(int pid, int len, int buf,
 	}
 	char *payload = calloc(128, sizeof(char));
 	char *url = calloc(128, sizeof(char));
-	// printf("%s\n", buffer);
-
+	
 	/* Add sender ID to it */
 	// snprintf(url, 128, NETWORK_POST "/%d", sender_ID);
 	snprintf(payload, 128, "{\"uid\": \"%d\", \"message\": \"%s\"}", sender_ID, buffer);
@@ -125,38 +156,46 @@ int main(void)
 		return -1;
 	}
 
-	char *data = network_get(NETWORK_URL, 1024);
-	if (!data) {
-		printf("Couldn't receive data\n");
-		return -2;
-	}
-
-	printf("Got: %s\n", data);
-
-	msg = parse_data(data, &num_messages);
-
-	/* Act as server towards morse_display service */
+  /* Act as client towards morse_display service */
 	ret = setup_display_ipc(&display_service);
 	if (ret < 0) {
 		printf("Couldn't setup Display Service\n");
 		return ret;
 	}
 
-	/* Act as client towards morse_button service */
+  /* Act as server towards morse_button service */
 	ipc_register_service_callback(main_ipc_callback, NULL);
 
+	user_id = register_user();
 
-	/* For each received message */
-	for (int i = 0; i < num_messages; i++)
-	{
-		display_done = false;
+	while (1) {
+		char *messsage_buffer = get_messages(user_id);
+		if (!messsage_buffer) {
+			printf("Couldn't receive data\n");
+			return -2;
+		}
 
-		/* Call the display service */
-		snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
-		ret = ipc_notify_service(display_service);
-		yield_for(&display_done);
+		printf("Mesaj de la server: %s\n", messsage_buffer);
+
+		msg = parse_data(messsage_buffer, &num_messages);
+
+
+		/* For each received message */
+		for (int i = 0; i < num_messages; i++)
+		{
+			display_done = false;
+				
+			/* Call the display service */
+			snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
+			ret = ipc_notify_service(display_service);
+			yield_for(&display_done);
+      delay_ms(1000);
+		}
+
+		free(messsage_buffer);
+
+		delay_ms(2000);
 	}
 
-	free(data);
 	return 0;
 }
