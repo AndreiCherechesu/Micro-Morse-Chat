@@ -3,7 +3,7 @@
 #ifndef _MORSE_DISPLAY_APP_H_
 #define _MORSE_DISPLAY_APP_H_
 
-#define MORSE_MAX_LEN 10
+#define MORSE_MAX_LEN 128
 
 struct message_t
 {
@@ -14,7 +14,7 @@ struct message_t
 int point[] = {NOTE_G4, 4};
 int dash[] = {NOTE_C4, -4};
 
-#define TEMPO 85
+#define TEMPO 126
 
 int clear[] = {
     0, 0, 0, 0, 0,

@@ -49,7 +49,7 @@ struct message_t *parse_data(char *data, int *num_messages)
 	{
 		sscanf(messages, "%d,%s", &(msg[i].uid), msg[i].morse);
 		printf("%d,%s\n", msg[i].uid, msg[i].morse);
-		messages += 12;
+		messages += strlen(msg[i].morse) + 2;
 	}
 
 	return msg;
@@ -87,15 +87,32 @@ static int setup_display_ipc(int *display_service)
 }
 
 int register_user() {
+	int user_id;
 	char *data = network_get(USERS_URL, 1024);
     if (!data) {
         printf("Couldn't receive data\n");
         return -2;
     }
 
-	printf("Received data: %s\n", data);
+	sscanf(data, "%d", &user_id);
 
 	free(data);
+
+	return user_id;
+}
+
+char *get_messages(int user_id) {
+	char *endpoint = calloc(128, sizeof(char));
+	sprintf(endpoint, "%s/%d", MESSAGES_URL, user_id);
+	char *data = network_get(endpoint, 1024);
+	if (!data) {
+		printf("Couldn't receive data\n");
+		return NULL;
+	}
+
+	free(endpoint);
+
+	return data;
 }
 
 int main(void)
@@ -116,23 +133,35 @@ int main(void)
 		return -3;
 	}
 
-	register_user();
+	int user_id = register_user();
+
+	while (1) {
+		char *messsage_buffer = get_messages(user_id);
+		if (!messsage_buffer) {
+			printf("Couldn't receive data\n");
+			return -2;
+		}
+
+		printf("Mesaj de la server: %s\n", messsage_buffer);
+
+		msg = parse_data(messsage_buffer, &num_messages);
 
 
-    // msg = parse_data(data, &num_messages);
+		/* For each received message */
+		for (int i = 0; i < num_messages; i++)
+		{
+			display_done = false;
+				
+			/* Call the display service */
+			snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
+			ret = ipc_notify_service(display_service);
+			yield_for(&display_done);
+		}
 
+		free(messsage_buffer);
 
-	/* For each received message */
-	// for (int i = 0; i < num_messages; i++)
-	// {
-	// 	display_done = false;
-			
-	// 	/* Call the display service */
-	// 	snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
-	// 	ret = ipc_notify_service(display_service);
-	// 	yield_for(&display_done);
-	// }
+		delay_ms(2000);
+	}
 
-	
 	return 0;
 }

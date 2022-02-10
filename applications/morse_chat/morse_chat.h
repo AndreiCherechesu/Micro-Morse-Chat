@@ -3,7 +3,7 @@
 #ifndef _MORSE_CHAT_APP_H_
 #define _MORSE_CHAT_APP_H_
 
-#define MORSE_MAX_LEN 10
+#define MORSE_MAX_LEN 128
 #define MAX_MESSAGES_NUM 
 
 struct message_t
