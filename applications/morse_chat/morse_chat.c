@@ -14,11 +14,12 @@
 
 
 #define NETWORK_URL "https://62044c2fc6d8b20017dc34c5.mockapi.io/api/v1/messages"
+#define NETWORK_POST "http://3.69.223.241:8000/messages"
 
 char display_buff[64] __attribute__((aligned(64)));
 bool display_done = false;
-
-/* 
+int sender_ID = 1;
+/*
  * Function to parse received serial morse data
  * Returns the data parsed into a struct message_t "msg"
  * Sets "num_messages"
@@ -31,7 +32,7 @@ struct message_t *parse_data(char *data, int *num_messages)
 
 	/* Get number of messages from buffer */
 	sscanf(data, "%d", num_messages);
-	
+
 	/* Alloc struct for parsing data */
 	msg = calloc(*num_messages, sizeof(struct message_t));
 	for (int i = 0; i < *num_messages; i++)
@@ -85,6 +86,33 @@ static int setup_display_ipc(int *display_service)
 	return 0;
 }
 
+static void main_ipc_callback(int pid, int len, int buf,
+					__attribute__ ((unused)) void* ud)
+{
+
+	/* Get message from Button Service */
+	char *buffer = (char *) buf;
+	if (!len) {
+		printf("Invalid length on received from button\n");
+		return;
+	}
+	char *payload = calloc(128, sizeof(char));
+	char *url = calloc(128, sizeof(char));
+	// printf("%s\n", buffer);
+
+	/* Add sender ID to it */
+	// snprintf(url, 128, NETWORK_POST "/%d", sender_ID);
+	snprintf(payload, 128, "{\"uid\": \"%d\", \"message\": \"%s\"}", sender_ID, buffer);
+
+	/* Do a network POST with it */
+	network_post(NETWORK_POST, payload);
+
+	/* Let the Button service know we're done */
+	ipc_notify_client(pid);
+
+	free(payload);
+}
+
 int main(void)
 {
 	struct message_t *msg;
@@ -103,23 +131,26 @@ int main(void)
 		return -2;
 	}
 
-	// network_post(NETWORK_URL, "{}");
-
 	printf("Got: %s\n", data);
 
 	msg = parse_data(data, &num_messages);
 
+	/* Act as server towards morse_display service */
 	ret = setup_display_ipc(&display_service);
 	if (ret < 0) {
 		printf("Couldn't setup Display Service\n");
-		return -3;
+		return ret;
 	}
+
+	/* Act as client towards morse_button service */
+	ipc_register_service_callback(main_ipc_callback, NULL);
+
 
 	/* For each received message */
 	for (int i = 0; i < num_messages; i++)
 	{
 		display_done = false;
-			
+
 		/* Call the display service */
 		snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
 		ret = ipc_notify_service(display_service);
