@@ -73,21 +73,21 @@ static void use_leds(int sender_id)
         else
             led_off(i);
     }
-  
+
 }
 
 static void ipc_callback(int pid, int len, int buf, __attribute__ ((unused)) void* ud) {
     char *buffer = (char *) buf;
     struct message_t msg;
-    msg.morse = calloc(MORSE_MAX_LEN, sizeof(char));
-    
+    msg.morse = calloc(MORSE_MAX_LEN + 1, sizeof(char));
+
     if (!len)
         return;
-    
+
     /* Get shared data */
     sscanf(buffer, "%d %s", &msg.uid, msg.morse);
     printf("[MORSE_DISPLAY]: %d %s", msg.uid, msg.morse);
-    
+
     /* Display sender ID using LEDs */
     use_leds(msg.uid);
 
