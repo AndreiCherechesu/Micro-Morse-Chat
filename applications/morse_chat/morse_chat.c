@@ -18,6 +18,7 @@
 
 char display_buff[64] __attribute__((aligned(64)));
 bool display_done = false;
+int user_id;
 
 /*
  * Function to parse received serial morse data
@@ -86,7 +87,8 @@ static int setup_display_ipc(int *display_service)
 	return 0;
 }
 
-int register_user() {
+int register_user()
+{
 	int user_id;
 	char *data = network_get(USERS_URL, 1024);
     if (!data) {
@@ -101,7 +103,8 @@ int register_user() {
 	return user_id;
 }
 
-char *get_messages(int user_id) {
+char *get_messages(int user_id)
+{
 	char *endpoint = calloc(128, sizeof(char));
 	sprintf(endpoint, "%s/%d", MESSAGES_URL, user_id);
 	char *data = network_get(endpoint, 1024);
@@ -113,6 +116,32 @@ char *get_messages(int user_id) {
 	free(endpoint);
 
 	return data;
+}
+
+static void main_ipc_callback(int pid, int len, int buf,
+					__attribute__ ((unused)) void* ud)
+{
+
+	/* Get message from Button Service */
+	char *buffer = (char *) buf;
+	if (!len) {
+		printf("Invalid length on received from button\n");
+		return;
+	}
+	char *payload = calloc(128, sizeof(char));
+	char *url = calloc(128, sizeof(char));
+	
+	/* Add sender ID to it */
+	// snprintf(url, 128, NETWORK_POST "/%d", sender_ID);
+	snprintf(payload, 128, "{\"uid\": \"%d\", \"message\": \"%s\"}", sender_ID, buffer);
+
+	/* Do a network POST with it */
+	network_post(NETWORK_POST, payload);
+
+	/* Let the Button service know we're done */
+	ipc_notify_client(pid);
+
+	free(payload);
 }
 
 int main(void)
@@ -127,13 +156,17 @@ int main(void)
 		return -1;
 	}
 
+  /* Act as client towards morse_display service */
 	ret = setup_display_ipc(&display_service);
 	if (ret < 0) {
 		printf("Couldn't setup Display Service\n");
-		return -3;
+		return ret;
 	}
 
-	int user_id = register_user();
+  /* Act as server towards morse_button service */
+	ipc_register_service_callback(main_ipc_callback, NULL);
+
+	user_id = register_user();
 
 	while (1) {
 		char *messsage_buffer = get_messages(user_id);
@@ -156,6 +189,7 @@ int main(void)
 			snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
 			ret = ipc_notify_service(display_service);
 			yield_for(&display_done);
+      delay_ms(1000);
 		}
 
 		free(messsage_buffer);
