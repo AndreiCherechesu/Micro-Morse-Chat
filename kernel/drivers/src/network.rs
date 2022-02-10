@@ -21,8 +21,10 @@ use kernel::processbuffer::{
 use kernel::syscall::{CommandReturn, SyscallDriver};
 use kernel::utilities::cells::TakeCell;
 use kernel::{debug, ErrorCode};
+use kernel::syscall::SyscallClass::Command;
 
 pub const DRIVER_NUM: usize = 0xa0001;
+pub const METHOD_SIZE: usize = 5;
 
 #[derive(Copy, Clone)]
 enum NetworkState {
@@ -60,113 +62,90 @@ impl<'a> Network<'a> {
 }
 
 impl<'a> SyscallDriver for Network<'a> {
-    fn command(
-        &self,
-        command_num: usize,
-        _r2: usize,
-        _r3: usize,
-        process_id: ProcessId,
+    fn command(&self,
+               command_num: usize,
+               _r2: usize,
+               _r3: usize,
+               process_id: ProcessId
     ) -> CommandReturn {
         match command_num {
             0 => CommandReturn::success(),
             // send request
+            // 2 => {
             1 => {
-                if let NetworkState::Idle = self.state.get() {
-                    let res = self
-                        .grant_access
-                        .enter(process_id, |app_storage, _upcalls_table| {
-                            // Result<Result<(), ErrorCode>, Error>
-                            let res = app_storage.address.enter(|address| {
-                                let buffer = self.buffer.take();
-                                if let Some(buffer) = buffer {
-                                    // buf[index].get() -> u8
-                                    if 5 + address.len() <= buffer.len() {
-                                        address.copy_to_slice(&mut buffer[5..address.len() + 5]);
-                                        buffer[5 + address.len()] = ' ' as u8;
-                                        if app_storage.data_out.len() > 0 {
-                                            // POST
-                                            app_storage
-                                                .data_out
-                                                .enter(move |data_out| {
-                                                    if 5 + address.len() + data_out.len()
-                                                        <= buffer.len()
-                                                    {
-                                                        data_out.copy_to_slice(
-                                                            &mut buffer[5 + address.len() + 1
-                                                                ..5 + address.len()
-                                                                    + 1
-                                                                    + data_out.len()],
-                                                        );
-                                                        &buffer[0..5]
-                                                            .copy_from_slice("POST ".as_bytes());
-                                                        buffer[5
-                                                            + address.len()
-                                                            + 1
-                                                            + data_out.len()] = '\n' as u8;
-                                                        if let Err((error, buffer)) =
-                                                            self.uart.transmit_buffer(
-                                                                buffer,
-                                                                5 + address.len()
-                                                                    + 1
-                                                                    + data_out.len()
-                                                                    + 1,
-                                                            )
-                                                        {
-                                                            self.buffer.replace(buffer);
-                                                            Err(error)
-                                                        } else {
-                                                            self.state.set(
-                                                                NetworkState::Requesting(
-                                                                    process_id,
-                                                                ),
-                                                            );
-                                                            Ok(())
-                                                        }
-                                                    } else {
-                                                        Err(ErrorCode::INVAL)
-                                                    }
-                                                })
-                                                .map_err(|err| err.into())
-                                                .and_then(|x| x)
-                                        } else {
-                                            // GET
-                                            &buffer[0..5].copy_from_slice("GET  ".as_bytes());
-                                            buffer[5 + address.len()] = '\n' as u8;
-                                            if let Err((error, buffer)) = self
-                                                .uart
-                                                .transmit_buffer(buffer, 5 + address.len() + 1)
-                                            {
-                                                self.buffer.replace(buffer);
-                                                Err(error)
-                                            } else {
-                                                self.state
-                                                    .set(NetworkState::Requesting(process_id));
-                                                Ok(())
-                                            }
-                                        }
-                                    } else {
-                                        Err(ErrorCode::SIZE)
-                                    }
-                                } else {
-                                    Err(ErrorCode::NOMEM)
+                match self.state.get() {
+                    NetworkState::Idle => (),
+                    _ => { return CommandReturn::failure(ErrorCode::BUSY) }
+                }
+                let res = self.grant_access.enter(process_id, |app_storage, _upcalls_table| {
+                    let res = app_storage.address.enter(|address| {
+                        let buffer = match self.buffer.take() {
+                            Some(buffer) => buffer,
+                            None => { return Err(ErrorCode::NOMEM); }
+                        };
+                        if buffer.len() < address.len() + METHOD_SIZE {
+                            return Err(ErrorCode::SIZE)
+                        }
+
+                        address.copy_to_slice(
+                            &mut buffer[METHOD_SIZE..address.len() + METHOD_SIZE]);
+                        buffer[METHOD_SIZE + address.len()] = ' ' as u8;
+                        
+                        if app_storage.data_out.len() > 0 {
+                            // POST
+                            app_storage.data_out.enter(move |data_out| {
+                                let start_idx = METHOD_SIZE + address.len() + 1;
+                                let end_idx = start_idx + data_out.len();
+                                if end_idx > buffer.len() + 1 {
+                                    return Err(ErrorCode::INVAL)
                                 }
-                            });
-                            match res {
-                                Ok(Ok(())) => Ok(()),
-                                Ok(Err(err)) => Err(err),
-                                Err(err) => Err(err.into()),
+
+                                data_out.copy_to_slice(&mut buffer[start_idx..end_idx]);
+                                &buffer[..METHOD_SIZE].copy_from_slice("POST ".as_bytes());
+                                buffer[end_idx] = '\n' as u8;
+
+                                match self.uart.transmit_buffer(buffer, end_idx + 1) {
+                                    Err((error, buffer)) => {
+                                        self.buffer.replace(buffer);
+                                        Err(error)
+                                    }
+                                    Ok(..) => {
+                                        self.state.set(NetworkState::Requesting(process_id));
+                                        Ok(())
+                                    }
+                                }
+                            })
+                                .map_err(|err| err.into())
+                                .and_then(|x| x)
+                        } else {
+                            // GET
+                            &buffer[..METHOD_SIZE].copy_from_slice("GET  ".as_bytes());
+                            buffer[METHOD_SIZE + address.len()] = '\n' as u8;
+
+                            match self.uart.transmit_buffer(buffer, METHOD_SIZE + address.len() + 1) {
+                                Err((error, buffer)) => {
+                                    self.buffer.replace(buffer);
+                                    Err(error)
+                                }
+                                Ok(..) => {
+                                    self.state.set(NetworkState::Requesting(process_id));
+                                    Ok(())
+                                }
                             }
-                        });
+                        }
+                    });
                     match res {
-                        Ok(Ok(())) => CommandReturn::success(),
-                        Ok(Err(err)) => CommandReturn::failure(err),
-                        Err(err) => CommandReturn::failure(err.into()),
+                        Ok(Ok(())) => Ok(()),
+                        Ok(Err(err)) => Err(err),
+                        Err(err) => Err(err.into()),
                     }
-                } else {
-                    CommandReturn::failure(ErrorCode::BUSY)
+                });
+                match res {
+                    Ok(Ok(())) => CommandReturn::success(),
+                    Ok(Err(err)) => CommandReturn::failure(err),
+                    Err(err) => CommandReturn::failure(err.into()),
                 }
             }
-            // 2 => {
             //     let res = self
             //         .grant_access
             //         .enter(process_id, |app_storage, _| app_storage.counter);
@@ -188,9 +167,9 @@ impl<'a> SyscallDriver for Network<'a> {
         match allow_num {
             // address
             0 => {
-                let res = self
-                    .grant_access
-                    .enter(process_id, |app_storage, _upcalls_table| {
+                let res = self.grant_access.enter(
+                    process_id,
+                    |app_storage, _upcalls_table| {
                         core::mem::swap(&mut app_storage.address, &mut buffer);
                     });
                 match res {
@@ -200,9 +179,9 @@ impl<'a> SyscallDriver for Network<'a> {
             }
             // data_out
             1 => {
-                let res = self
-                    .grant_access
-                    .enter(process_id, |app_storage, _upcalls_table| {
+                let res = self.grant_access.enter(
+                    process_id,
+                    |app_storage, _upcalls_table| {
                         core::mem::swap(&mut app_storage.data_out, &mut buffer);
                     });
                 match res {
@@ -223,9 +202,9 @@ impl<'a> SyscallDriver for Network<'a> {
         match allow_num {
             // data_in
             0 => {
-                let res = self
-                    .grant_access
-                    .enter(process_id, |app_storage, _upcalls_table| {
+                let res = self.grant_access.enter(
+                    process_id,
+                    |app_storage, _upcalls_table| {
                         core::mem::swap(&mut app_storage.data_in, &mut buffer);
                     });
                 match res {
@@ -238,8 +217,9 @@ impl<'a> SyscallDriver for Network<'a> {
     }
 
     fn allocate_grant(&self, process_id: ProcessId) -> Result<(), Error> {
-        self.grant_access
-            .enter(process_id, |_app_storage, _upcalls_table| {})
+        self.grant_access.enter(
+            process_id,
+            |_app_storage, _upcalls_table| {})
     }
 }
 
@@ -252,7 +232,7 @@ impl<'a> TransmitClient for Network<'a> {
     ) {
         match rval {
             Ok(()) => {
-                if let Err((error, buffer)) = self.uart.receive_buffer(tx_buffer, 1) {
+                if let Err((error, buffer)) = self.uart.receive_buffer(tx_buffer, 128) {
                     self.buffer.replace(buffer);
                     if let NetworkState::Requesting(process_id) = self.state.get() {
                         let _ = self.grant_access.enter(process_id, |_, upcalls_table| {
@@ -267,8 +247,8 @@ impl<'a> TransmitClient for Network<'a> {
                 self.buffer.replace(tx_buffer);
                 if let NetworkState::Requesting(process_id) = self.state.get() {
                     let _ = self.grant_access.enter(process_id, |_, upcalls_table| {
-                        let _ =
-                            upcalls_table.schedule_upcall(0, (into_statuscode(Err(error)), 0, 0));
+                        let _ = upcalls_table
+                            .schedule_upcall(0, (into_statuscode(Err(error)), 0, 0));
                     });
                 }
                 self.state.set(NetworkState::Idle);
@@ -289,28 +269,28 @@ impl<'a> ReceiveClient for Network<'a> {
             Ok(()) => {
                 debug!("received data");
                 if let NetworkState::Requesting(process_id) = self.state.get() {
-                    let _ = self
-                        .grant_access
-                        .enter(process_id, |app_storage, upcalls_table| {
-                            let res = app_storage
-                                .data_in
-                                .mut_enter(|data_in| {
-                                    if rx_buffer.len() < data_in.len() {
-                                        data_in.copy_from_slice(&rx_buffer);
-                                        data_in[rx_len - 1].set(0);
-                                    }
-                                })
-                                .map_err(|err| err.into());
-                            let _ =
-                                upcalls_table.schedule_upcall(0, (into_statuscode(res), rx_len, 0));
-                        });
+                    let _ = self.grant_access.enter(process_id, |app_storage, upcalls_table| {
+                        let res = app_storage.data_in.mut_enter(|data_in| {
+                            // debug!("Am intrat v1");
+                            // debug!("{:?}", rx_len);
+                            // debug!("{:?}", rx_buffer);
+                            if rx_len < data_in.len() {
+                                // debug!("Am intrat v2");
+                                data_in[0..rx_len].copy_from_slice(&rx_buffer[0..rx_len]);
+                                data_in[rx_len].set(0);
+                            }
+                            // debug!("{:?}", data_in);
+                        })
+                        .map_err(|err| err.into());
+                        let _ = upcalls_table.schedule_upcall(0, (into_statuscode(res), rx_len, 0));
+                    });
                 }
             }
             Err(error) => {
+                debug!("am intrat pe error");
                 if let NetworkState::Requesting(process_id) = self.state.get() {
                     let _ = self.grant_access.enter(process_id, |_, upcalls_table| {
-                        let _ =
-                            upcalls_table.schedule_upcall(0, (into_statuscode(Err(error)), 0, 0));
+                        let _ = upcalls_table.schedule_upcall(0, (into_statuscode(Err(error)), 0, 0));
                     });
                 }
             }

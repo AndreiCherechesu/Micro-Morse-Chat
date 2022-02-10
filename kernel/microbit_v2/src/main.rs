@@ -633,7 +633,7 @@ pub unsafe fn main() {
     );
     CHIP = Some(chip);
 
-    debug!("Initialization complete. Entering main loop.");
+    // debug!("Initialization complete. Entering main loop.");
 
     //--------------------------------------------------------------------------
     // PROCESSES AND MAIN LOOP
