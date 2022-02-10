@@ -28,11 +28,15 @@ int user_id;
 
 struct message_t *parse_data(char *data, int *num_messages)
 {
-	char *messages = data + 2;
+	char *messages, *num_messages_str;
 	struct message_t *msg;
 
 	/* Get number of messages from buffer */
 	sscanf(data, "%d", num_messages);
+	num_messages_str = calloc(5, sizeof(char));
+
+	/* Skip num_messages when reading data */
+	messages = data + strlen(itoa(*num_messages, num_messages_str, 10));
 
 	/* Alloc struct for parsing data */
 	msg = calloc(*num_messages, sizeof(struct message_t));
@@ -40,8 +44,6 @@ struct message_t *parse_data(char *data, int *num_messages)
 	{
 		msg[i].morse = calloc(MORSE_MAX_LEN, sizeof(char));
 	}
-
-	// char *messages = calloc(128, sizeof(char));
 
 	printf("Avem de citit %d mesaje!\n", *num_messages);
 	printf("Mesajele de citit: %s\n", messages);
@@ -56,7 +58,11 @@ struct message_t *parse_data(char *data, int *num_messages)
 	return msg;
 }
 
-static void display_ipc_callback(int pid, int len, int arg2, void *ud)
+static void display_ipc_callback(
+		__attribute__ ((unused)) int pid,
+		__attribute__ ((unused)) int len,
+		__attribute__ ((unused)) int arg2,
+		__attribute__ ((unused)) void *ud)
 {
 	display_done = true;
 }
@@ -87,9 +93,8 @@ static int setup_display_ipc(int *display_service)
 	return 0;
 }
 
-int register_user()
+static int register_user(void)
 {
-	int user_id;
 	char *data = network_get(USERS_URL, 1024);
     if (!data) {
         printf("Couldn't receive data\n");
@@ -100,13 +105,13 @@ int register_user()
 
 	free(data);
 
-	return user_id;
+	return 0;
 }
 
-char *get_messages(int user_id)
+static char *get_messages(void)
 {
 	char *endpoint = calloc(128, sizeof(char));
-	sprintf(endpoint, "%s/%d", MESSAGES_URL, user_id);
+	snprintf(endpoint, 128, "%s/%d", MESSAGES_URL, user_id);
 	char *data = network_get(endpoint, 1024);
 	if (!data) {
 		printf("Couldn't receive data\n");
@@ -129,14 +134,12 @@ static void main_ipc_callback(int pid, int len, int buf,
 		return;
 	}
 	char *payload = calloc(128, sizeof(char));
-	char *url = calloc(128, sizeof(char));
 	
 	/* Add sender ID to it */
-	// snprintf(url, 128, NETWORK_POST "/%d", sender_ID);
-	snprintf(payload, 128, "{\"uid\": \"%d\", \"message\": \"%s\"}", sender_ID, buffer);
+	snprintf(payload, 128, "{\"uid\": \"%d\", \"message\": \"%s\"}", user_id, buffer);
 
 	/* Do a network POST with it */
-	network_post(NETWORK_POST, payload);
+	network_post(MESSAGES_URL, payload);
 
 	/* Let the Button service know we're done */
 	ipc_notify_client(pid);
@@ -166,10 +169,14 @@ int main(void)
   /* Act as server towards morse_button service */
 	ipc_register_service_callback(main_ipc_callback, NULL);
 
-	user_id = register_user();
+	ret = register_user();
+	if (ret < 0) {
+		printf("Couldn't get user ID from remote server\n");
+		return ret;
+	}
 
 	while (1) {
-		char *messsage_buffer = get_messages(user_id);
+		char *messsage_buffer = get_messages();
 		if (!messsage_buffer) {
 			printf("Couldn't receive data\n");
 			return -2;
