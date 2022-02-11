@@ -63,6 +63,11 @@ static void button_callback(
 				reset_state();
 				send_mode_active = true;
 				printf("Send mode activated\n");
+
+				main_done = false;
+				main_buff[0] = 0xff;
+				ipc_notify_service(main_service);
+				yield_for(&main_done);
 			}
 		}
 
