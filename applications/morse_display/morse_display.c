@@ -131,17 +131,17 @@ static void use_leds(char *data, int *recording)
     }
 
     for (int i = 0; i < num_leds; i++) {
-		if (*recording == 1) {
-			if (recording_mode[i])
-				led_on(i);
-			else
-				led_off(i);
-		} else {
-			if (decode_morse(data)[i])
-            	led_on(i);
-			else
-				led_off(i);
-		}
+      if (*recording == 1) {
+        if (recording_mode[i])
+          led_on(i);
+        else
+          led_off(i);
+      } else {
+        if (decode_morse(data)[i])
+                led_on(i);
+        else
+          led_off(i);
+      }
     }
 
 }
@@ -175,6 +175,7 @@ static void ipc_callback(int pid, int len, int buf, __attribute__ ((unused)) voi
 
 	/* Clear leds */
 	use_leds(NULL, &recording);
+
 
     ipc_notify_client(pid);
 }

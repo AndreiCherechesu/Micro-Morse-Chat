@@ -278,7 +278,7 @@ int letter_unknown[] = {
     0, 0, 0, 1, 0,
     0, 0, 1, 0, 0,
     0, 0, 1, 0, 0
-};
+
 
 int recording_mode[] = {
     1, 1, 1, 1, 1,
