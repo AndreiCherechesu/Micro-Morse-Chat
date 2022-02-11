@@ -51,9 +51,12 @@ struct message_t *parse_data(char *data, int *num_messages)
 
 	for (int i = 0; i < *num_messages; i++)
 	{
+		printf("Mesajul ramas: %s\n", messages);
+
 		sscanf(messages, "%d,%s", &(msg[i].uid), msg[i].morse);
 		printf("%d,%s\n", msg[i].uid, msg[i].morse);
-		messages += strlen(msg[i].morse) + 2;
+
+		messages += strlen(msg[i].morse) + strlen(itoa(msg[i].uid, num_messages_str, 10)) + 2;
 	}
 
 	return msg;
@@ -193,7 +196,7 @@ int main(void)
 	while (1) {
 		/* Wait for network to be unused */
 		if (network_lock) {
-			delay_ms(7000);
+			delay_ms(2000);
 			printf("Network is locked...\n");
 			continue;
 		}
@@ -218,12 +221,13 @@ int main(void)
 			snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
 			ret = ipc_notify_service(display_service);
 			yield_for(&display_done);
-			delay_ms(1000);
+			delay_ms(200);
 		}
 
 		free(messsage_buffer);
+		free(msg);
 
-		delay_ms(7000);
+		delay_ms(2000);
 	}
 
 	return 0;

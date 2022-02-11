@@ -130,9 +130,6 @@ static void use_leds(char *data)
         return;
     }
 
-	if (sender_id > max_digit)
-		sender_id %= (max_digit + 1);
-
     for (int i = 0; i < num_leds; i++) {
         if (decode_morse(data)[i])
             led_on(i);
