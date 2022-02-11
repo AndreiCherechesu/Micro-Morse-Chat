@@ -120,7 +120,7 @@ static int *decode_morse(char *data)
 	return letter_unknown;
 }
 
-static void use_leds(char *data)
+static void use_leds(char *data, int *recording)
 {
     int num_leds;
 
@@ -131,10 +131,17 @@ static void use_leds(char *data)
     }
 
     for (int i = 0; i < num_leds; i++) {
-        if (decode_morse(data)[i])
-            led_on(i);
-        else
-            led_off(i);
+		if (*recording == 1) {
+			if (recording_mode[i])
+				led_on(i);
+			else
+				led_off(i);
+		} else {
+			if (decode_morse(data)[i])
+            	led_on(i);
+			else
+				led_off(i);
+		}
     }
 
 }
@@ -148,17 +155,26 @@ static void ipc_callback(int pid, int len, int buf, __attribute__ ((unused)) voi
         return;
 
     /* Get shared data */
-    sscanf(buffer, "%d %s", &msg.uid, msg.morse);
-    printf("[MORSE_DISPLAY]: %d %s", msg.uid, msg.morse);
+	int recording;
 
-    /* Display sender ID using LEDs */
-    use_leds((char *) msg.morse);
+    sscanf(buffer, "%d %d %s", &recording, &msg.uid, msg.morse);
 
-    /* Play the buzzer */
-    use_buzzer((char *) msg.morse);
+	printf("[MORSE_DISPLAY]: %d %s\n", msg.uid, msg.morse);
 
-    /* Clear leds */
-    use_leds(NULL);
+	if (recording == 1) {
+		use_leds(NULL, &recording);
+	    ipc_notify_client(pid);
+		return;
+	}
+
+	/* Display sender ID using LEDs */
+	use_leds((char *) msg.morse, &recording);
+
+	/* Play the buzzer */
+	use_buzzer((char *) msg.morse);
+
+	/* Clear leds */
+	use_leds(NULL, &recording);
 
     ipc_notify_client(pid);
 }

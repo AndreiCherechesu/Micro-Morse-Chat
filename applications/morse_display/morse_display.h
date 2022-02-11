@@ -280,6 +280,14 @@ int letter_unknown[] = {
     0, 0, 1, 0, 0
 };
 
+int recording_mode[] = {
+    1, 1, 1, 1, 1,
+    1, 0, 0, 0, 1,
+    1, 0, 1, 0, 1,
+    1, 0, 0, 0, 1,
+    1, 1, 1, 1, 1
+};
+
 int *digits[] = {clear, digit_1, digit_2, digit_3, digit_4, digit_5};
 int num_digits = 5;
 

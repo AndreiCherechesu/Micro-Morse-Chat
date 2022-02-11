@@ -18,6 +18,7 @@
 
 char display_buff[64] __attribute__((aligned(64)));
 bool display_done = false;
+int display_service;
 int user_id;
 bool network_lock;
 
@@ -135,6 +136,13 @@ static void main_ipc_callback(int pid, int len, int buf,
 
 	if (lock[0] == 0xff) {
 		network_lock = true;
+		
+		/* Call the display service */
+		display_done = false;
+		snprintf(display_buff, 64, "%d %d %s", 1, 0, "");
+		ipc_notify_service(display_service);
+		yield_for(&display_done);
+		
 		printf("Network locked\n");
 		return;
 	}
@@ -156,6 +164,13 @@ static void main_ipc_callback(int pid, int len, int buf,
 	/* Unlock networking */
 	if (lock[0] != 0xff) {
 		network_lock = false;
+
+		/* Call the display service */
+		display_done = false;
+		snprintf(display_buff, 64, "%d %d %s", 0, 0, "");
+		ipc_notify_service(display_service);
+		yield_for(&display_done);
+
 		printf("Network unlocked\n");
 	}
 
@@ -169,7 +184,6 @@ int main(void)
 {
 	struct message_t *msg;
 	int ret;
-	int display_service;
 	int num_messages;
 
 	if (!driver_exists(DRIVER_NUM_NETWORK)) {
@@ -218,7 +232,7 @@ int main(void)
 			display_done = false;
 				
 			/* Call the display service */
-			snprintf(display_buff, 64, "%d %s", msg[i].uid, msg[i].morse);
+			snprintf(display_buff, 64, "%d %d %s", 0, msg[i].uid, msg[i].morse);
 			ret = ipc_notify_service(display_service);
 			yield_for(&display_done);
 			delay_ms(200);
