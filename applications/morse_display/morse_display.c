@@ -57,7 +57,70 @@ static void use_buzzer(char *data)
 	}
 }
 
-static void use_leds(int sender_id)
+static int *decode_morse(char *data)
+{
+	if (data == NULL) {
+		return clear;
+	}
+
+	if (strcmp(data, ".-") == 0) {
+		return letter_A;
+	} else if (strcmp(data, "-...") == 0) {
+		return letter_B;
+	} else if (strcmp(data, "-.-.") == 0) {
+		return letter_C;
+	} else if (strcmp(data, "-..") == 0) {
+		return letter_D;
+	} else if (strcmp(data, ".") == 0) {
+		return letter_E;
+	} else if (strcmp(data, "..-.") == 0) {
+		return letter_F;
+	} else if (strcmp(data, "--.") == 0) {
+		return letter_G;
+	} else if (strcmp(data, "....") == 0) {
+		return letter_H;
+	} else if (strcmp(data, "..") == 0) {
+		return letter_I;
+	} else if (strcmp(data, ".---") == 0) {
+		return letter_J;
+	} else if (strcmp(data, "-.-") == 0) {
+		return letter_K;
+	} else if (strcmp(data, ".-..") == 0) {
+		return letter_L;
+	} else if (strcmp(data, "--") == 0) {
+		return letter_M;
+	} else if (strcmp(data, "-.") == 0) {
+		return letter_N;
+	} else if (strcmp(data, "---") == 0) {
+		return letter_O;
+	} else if (strcmp(data, ".--.") == 0) {
+		return letter_P;
+	} else if (strcmp(data, "--.-") == 0) {
+		return letter_Q;
+	} else if (strcmp(data, ".-.") == 0) {
+		return letter_R;
+	} else if (strcmp(data, "...") == 0) {
+		return letter_S;
+	} else if (strcmp(data, "-") == 0) {
+		return letter_T;
+	} else if (strcmp(data, "..-") == 0) {
+		return letter_U;
+	} else if (strcmp(data, "...-") == 0) {
+		return letter_V;
+	} else if (strcmp(data, ".--") == 0) {
+		return letter_W;
+	} else if (strcmp(data, "-..-") == 0) {
+		return letter_X;
+	} else if (strcmp(data, "-.--") == 0) {
+		return letter_Y;
+	} else if (strcmp(data, "--..") == 0) {
+		return letter_Z;
+	}
+
+	return letter_unknown;
+}
+
+static void use_leds(char *data)
 {
     int num_leds;
 
@@ -71,7 +134,7 @@ static void use_leds(int sender_id)
 		sender_id %= (max_digit + 1);
 
     for (int i = 0; i < num_leds; i++) {
-        if (digits[sender_id][i])
+        if (decode_morse(data)[i])
             led_on(i);
         else
             led_off(i);
@@ -92,13 +155,13 @@ static void ipc_callback(int pid, int len, int buf, __attribute__ ((unused)) voi
     printf("[MORSE_DISPLAY]: %d %s", msg.uid, msg.morse);
 
     /* Display sender ID using LEDs */
-    use_leds(msg.uid);
+    use_leds((char *) msg.morse);
 
     /* Play the buzzer */
     use_buzzer((char *) msg.morse);
 
     /* Clear leds */
-    use_leds(0);
+    use_leds(NULL);
 
     ipc_notify_client(pid);
 }
