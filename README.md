@@ -5,9 +5,12 @@ Micro Morse Chat is a multi-client application that allows multiple Micro:bit pl
 
 The Micro Morse Chat application supports both GET and POST operations, to retrieve and send data to a remote web server.
 
-The Morse Code characters are sent from the 'Morse Button' application, which listens on the button presses, to the main 'Morse Chat App' via the Tock IPC library. Next, the 'Morse Chat App' sends the characters, using a 'Network Driver' capsule (which uses a Console Driver), over a serial connection (UART) to a PC, which runs a proxy 'Gateway App'.  The ‘Gateway App’ retrieves messages sent by Micro:bit and forwards them, packed as HTTP Requests, to a remote web server.
+The Morse Code characters are sent from the 'Morse Button' application, which listens on the button presses, to the main 'Morse Chat App' via the Tock IPC library. To enter the character recording mode, the user needs to hold down first the Left Button then the Right Button, then release them in the
+same order. Next, the 'Morse Button' records the characters, using the Left Button to send a '.' (dot) and the Right Button to send a '-' (dash). When the buffer is full or if the sending mode has been terminated early (in the same way in which the sending mode is entered), the buffer is sent to the Morse Chat App via IPC.
+ 
+The Morse Chat App then sends the received characters, using a 'Network Driver' capsule (which uses a Console Driver), over a serial connection (UART) to a PC, which runs a proxy 'Gateway App'. The ‘Gateway App’ retrieves messages sent by Micro:bit and forwards them, packed as HTTP Requests, to a remote web server.
 
-The server stores the messages (each containing the ID of the Morse Chat client that sent it) until they are requested by the client applications. These requests are made periodically, asynchronously, by Micro:bit clients, from the Micro Morse Chat application.
+The server stores the messages (each containing the ID of the Morse Chat client that sent it) until they are requested by the client applications. These requests are made periodically, asynchronously, by Micro:bit clients, from the Micro Morse Chat application. A message sent by a client is fetched by all clients except himself.
 
 Once a message reaches the client, the Morse Chat App "decodes" the message, using the buzzer to audibly transmit the received message, and the LED Matrix to display the received message (letter by letter) or the digit corresponding to the sender ID of the message, using the Morse Display App. Communication between the two applications is also done using Tock IPC.
 
