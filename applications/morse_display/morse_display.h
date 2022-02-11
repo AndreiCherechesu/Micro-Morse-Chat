@@ -65,14 +65,39 @@ int digit_5[] = {
 };
 
 int digit_6[] = {
-	0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0,
-	0, 0, 1, 0, 0,
-	0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0,
+	0, 1, 1, 1, 0,
+	0, 1, 0, 0, 0,
+	0, 1, 1, 1, 0,
+	0, 1, 0, 1, 0,
+	0, 1, 1, 1, 0,
 };
 
-int *digits[] = {clear, digit_1, digit_2, digit_3, digit_4, digit_5, digit_6, digit_6, digit_6, digit_6};
+int digit_7[] = {
+	1, 1, 1, 1, 1,
+	0, 0, 0, 1, 0,
+	0, 1, 1, 1, 0,
+	0, 1, 0, 0, 0,
+	1, 0, 0, 0, 0
+};
+
+int digit_8[] = {
+	0, 1, 1, 1, 0,
+	0, 1, 0, 1, 0,
+	0, 1, 1, 1, 0,
+	0, 1, 0, 1, 0,
+	0, 1, 1, 1, 0
+};
+
+
+int digit_9[] = {
+	0, 1, 1, 1, 0,
+	0, 1, 0, 1, 0,
+	0, 1, 1, 1, 0,
+	0, 0, 0, 1, 0,
+	0, 1, 1, 1, 0
+};
+
+int *digits[] = {clear, digit_1, digit_2, digit_3, digit_4, digit_5, digit_6, digit_7, digit_8, digit_9};
 int max_digit = 9;
 
 #endif /* _MORSE_DISPLAY_APP_H_ */
