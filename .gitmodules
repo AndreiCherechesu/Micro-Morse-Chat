@@ -4,3 +4,9 @@
 [submodule "libtock-c"]
 	path = libtock-c
 	url = https://github.com/tock/libtock-c.git
+[submodule "Morse-Chat-Gateway"]
+	path = Morse-Chat-Gateway
+	url = git@github.com:AndreiCherechesu/Morse-Chat-Gateway.git
+[submodule "Morse-Chat-Server"]
+	path = Morse-Chat-Server
+	url = git@github.com:AndreiCherechesu/Morse-Chat-Server.git
