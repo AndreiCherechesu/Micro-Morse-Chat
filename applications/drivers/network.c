@@ -34,7 +34,7 @@ char *network_get(const char *url, size_t len) {
         goto unallow_rw;
     }
     
-    sys = command(DRIVER_NUM_NETWORK, 1, 0, 0);
+    sys = command(DRIVER_NUM_NETWORK, 1, COMMAND_GET, 0);
     if (sys.type != TOCK_SYSCALL_SUCCESS) {
         goto unallow_rw;
     }
@@ -63,9 +63,7 @@ void network_post(const char *url, const char *payload) {
         goto unallow_ro1;
     }
 
-    sys = command(DRIVER_NUM_NETWORK, 1, 0, 0);
-    if (sys.type == TOCK_SYSCALL_SUCCESS) 
-        return;
+    sys = command(DRIVER_NUM_NETWORK, 1, COMMAND_POST, 0);
         
 unallow_ro1:  
     allow_readonly(DRIVER_NUM_NETWORK, 1, NULL, 0);

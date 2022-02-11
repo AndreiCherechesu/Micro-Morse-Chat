@@ -64,7 +64,7 @@ impl<'a> Network<'a> {
 impl<'a> SyscallDriver for Network<'a> {
     fn command(&self,
                command_num: usize,
-               _r2: usize,
+               r2: usize,
                _r3: usize,
                process_id: ProcessId
     ) -> CommandReturn {
@@ -91,7 +91,7 @@ impl<'a> SyscallDriver for Network<'a> {
                             &mut buffer[METHOD_SIZE..address.len() + METHOD_SIZE]);
                         buffer[METHOD_SIZE + address.len()] = ' ' as u8;
                         
-                        if app_storage.data_out.len() > 0 {
+                        if r2 > 0 {
                             // POST
                             app_storage.data_out.enter(move |data_out| {
                                 let start_idx = METHOD_SIZE + address.len() + 1;
