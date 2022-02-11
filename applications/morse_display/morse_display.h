@@ -64,7 +64,15 @@ int digit_5[] = {
 	0, 1, 1, 1, 0
 };
 
-int *digits[] = {clear, digit_1, digit_2, digit_3, digit_4, digit_5};
-int num_digits = 5;
+int digit_6[] = {
+	0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0,
+	0, 0, 1, 0, 0,
+	0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0,
+};
+
+int *digits[] = {clear, digit_1, digit_2, digit_3, digit_4, digit_5, digit_6, digit_6, digit_6, digit_6};
+int max_digit = 9;
 
 #endif /* _MORSE_DISPLAY_APP_H_ */

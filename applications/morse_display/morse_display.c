@@ -67,6 +67,9 @@ static void use_leds(int sender_id)
         return;
     }
 
+	if (sender_id > max_digit)
+		sender_id %= (max_digit + 1);
+
     for (int i = 0; i < num_leds; i++) {
         if (digits[sender_id][i])
             led_on(i);
